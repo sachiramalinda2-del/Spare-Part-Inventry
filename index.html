@@ -260,6 +260,10 @@
         <select id="manualPickSelect"></select>
         <button class="btn btn-outline" style="margin-top:10px;" onclick="confirmManualPick()">Use this location</button>
       </div>
+      <div id="scanPreviewWrap" style="display:none;" class="card">
+        <p style="font-size:11px; color:var(--muted); margin:0 0 8px;">Last photo taken:</p>
+        <img id="scanPreviewImg" style="max-width:100%; border-radius:6px; border:1px solid var(--border); display:block;">
+      </div>
     </div>
 
     <div id="scanResolved" style="display:none;">
@@ -478,11 +482,16 @@ function handleScanFile(evt){
   const file = evt.target.files[0];
   if(!file) return;
   showToast('Reading photo…');
+  const previewWrap = document.getElementById('scanPreviewWrap');
+  const previewImg = document.getElementById('scanPreviewImg');
+  previewImg.src = URL.createObjectURL(file);
+  previewWrap.style.display = 'block';
   const img = new Image();
   img.onload = function(){
     try{
       const result = decodeImageMultiScale(img);
       if(result && result.data && result.data.startsWith('LOC:')){
+        previewWrap.style.display = 'none';
         resolveLocation(result.data.slice(4));
       }else{
         showToast('No QR found — try closer, more light, steady hand');
@@ -501,7 +510,7 @@ function handleScanFile(evt){
     showToast('Could not open that photo — try again');
     evt.target.value = '';
   };
-  img.src = URL.createObjectURL(file);
+  img.src = previewImg.src;
 }
 
 function showManualPick(){
