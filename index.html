@@ -200,6 +200,8 @@
 </head>
 <body>
 
+<div id="libWarning" style="display:none; background:var(--red); color:#fff; padding:10px 14px; text-align:center; font-size:12px; font-family:'IBM Plex Mono';"></div>
+
 <header class="top">
   <div class="brand">
     <h1>Spare Room</h1>
@@ -471,7 +473,11 @@ function handleScanFile(evt){
       }
     }catch(e){
       console.error('decode error', e);
-      showToast('Could not read that photo — try again');
+      if(typeof jsQR === 'undefined'){
+        showToast('QR scanner failed to load — check internet & reload page');
+      }else{
+        showToast('Could not read that photo — try again');
+      }
     }
     evt.target.value = '';
   };
@@ -709,7 +715,22 @@ function exportExcel(){
   XLSX.writeFile(wb, 'spare-inventory.xlsx');
 }
 
+function checkLibraries(){
+  const missing = [];
+  if(typeof QRCode === 'undefined') missing.push('QR generator');
+  if(typeof jsQR === 'undefined') missing.push('QR scanner');
+  if(typeof XLSX === 'undefined') missing.push('Excel export');
+  const banner = document.getElementById('libWarning');
+  if(missing.length){
+    banner.textContent = '⚠ ' + missing.join(', ') + ' failed to load — check your internet connection and reload the page';
+    banner.style.display = 'block';
+  }else{
+    banner.style.display = 'none';
+  }
+}
+
 loadAll();
+checkLibraries();
 </script>
 </body>
 </html>
