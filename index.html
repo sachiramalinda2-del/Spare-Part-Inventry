@@ -189,11 +189,11 @@
     }
     .print-label{
       display:inline-flex; flex-direction:column; align-items:center; justify-content:center;
-      width:31%; margin:1%; padding:8px; border:1px dashed #999; page-break-inside:avoid;
+      width:46%; margin:1.5%; padding:10px; border:1px dashed #999; page-break-inside:avoid;
     }
-    .print-label canvas{width:100px; height:100px;}
-    .print-label .pcode{font-family:monospace; font-size:11px; font-weight:bold; margin-top:4px;}
-    .print-label .ppath{font-family:sans-serif; font-size:9px; text-align:center;}
+    .print-label canvas{width:160px; height:160px;}
+    .print-label .pcode{font-family:monospace; font-size:14px; font-weight:bold; margin-top:6px;}
+    .print-label .ppath{font-family:sans-serif; font-size:10px; text-align:center;}
   }
   a.link-btn{color:var(--yellow); font-size:12px; text-decoration:underline; cursor:pointer; text-align:center; display:block; margin-top:10px;}
 </style>
@@ -440,12 +440,39 @@ function printLabels(){
     const qrId = 'p-qr-'+loc.code;
     box.innerHTML = `<div id="${qrId}"></div><div class="pcode">${loc.code}</div><div class="ppath">${loc.cupboard} / ${loc.deck}${loc.bin?' / '+loc.bin:''}</div>`;
     area.appendChild(box);
-    new QRCode(document.getElementById(qrId), {text:'LOC:'+loc.code, width:100, height:100, correctLevel: QRCode.CorrectLevel.M});
+    new QRCode(document.getElementById(qrId), {text:'LOC:'+loc.code, width:280, height:280, correctLevel: QRCode.CorrectLevel.M});
   });
   setTimeout(()=>window.print(), 200);
 }
 
 /* ---------- SCAN ---------- */
+
+function tryDecode(imageData){
+  return jsQR(imageData.data, imageData.width, imageData.height, {inversionAttempts:"attemptBoth"});
+}
+
+function decodeImageMultiScale(img){
+  const candidates = [Math.max(img.width,img.height), 1800, 1200, 900, 600];
+  const tried = new Set();
+  for(const targetMax of candidates){
+    if(tried.has(targetMax)) continue;
+    tried.add(targetMax);
+    let w = img.width, h = img.height;
+    if(Math.max(w,h) > targetMax){
+      const scale = targetMax/Math.max(w,h);
+      w = Math.round(w*scale); h = Math.round(h*scale);
+    }
+    if(w < 50 || h < 50) continue;
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img,0,0,w,h);
+    const data = ctx.getImageData(0,0,w,h);
+    const result = tryDecode(data);
+    if(result && result.data) return result;
+  }
+  return null;
+}
 
 function handleScanFile(evt){
   const file = evt.target.files[0];
@@ -454,18 +481,7 @@ function handleScanFile(evt){
   const img = new Image();
   img.onload = function(){
     try{
-      let w = img.width, h = img.height;
-      const maxDim = 1400;
-      if(Math.max(w,h) > maxDim){
-        const scale = maxDim / Math.max(w,h);
-        w = Math.round(w*scale); h = Math.round(h*scale);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img,0,0,w,h);
-      const data = ctx.getImageData(0,0,w,h);
-      const result = jsQR(data.data, data.width, data.height);
+      const result = decodeImageMultiScale(img);
       if(result && result.data && result.data.startsWith('LOC:')){
         resolveLocation(result.data.slice(4));
       }else{
