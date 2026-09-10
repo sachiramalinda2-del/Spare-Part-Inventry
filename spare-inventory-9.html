@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Spare Room — Inventory</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#1B1E20;
+    --panel:#24282B;
+    --panel-2:#2C3134;
+    --yellow:#F4B400;
+    --yellow-dim:#B98A00;
+    --red:#D6543E;
+    --green:#5CA37A;
+    --text:#ECEAE5;
+    --muted:#93999D;
+    --border:#3A3F42;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Mono',monospace;
+    min-height:100vh;
+    padding-bottom:78px;
+  }
+  h1,h2,h3,.label-face{
+    font-family:'Oswald',sans-serif;
+    text-transform:uppercase;
+    letter-spacing:0.03em;
+    margin:0;
+  }
+  header.top{
+    position:sticky; top:0; z-index:20;
+    background:var(--panel);
+    border-bottom:3px solid var(--yellow);
+    padding:14px 16px 12px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  header.top .brand{display:flex; flex-direction:column; line-height:1;}
+  header.top .brand span.tag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px; color:var(--muted); letter-spacing:.12em; margin-top:3px;
+  }
+  header.top h1{font-size:20px; color:var(--yellow);}
+  .icon-btn{
+    background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+    border-radius:6px; padding:9px 12px; font-size:12px; font-family:'IBM Plex Mono';
+    display:flex; align-items:center; gap:6px; cursor:pointer;
+  }
+  .icon-btn:active{background:var(--yellow); color:#1B1E20; border-color:var(--yellow);}
+  main{padding:16px; max-width:640px; margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .stats-row{display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:16px;}
+  .stat{
+    background:var(--panel); border:1px solid var(--border); border-radius:8px;
+    padding:10px 8px; text-align:center;
+  }
+  .stat .num{font-family:'Oswald'; font-size:22px; color:var(--yellow); font-weight:600;}
+  .stat .lbl{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-top:2px;}
+
+  input[type=text], input[type=number], select{
+    width:100%; padding:11px 12px; background:var(--panel-2); border:1px solid var(--border);
+    color:var(--text); border-radius:6px; font-family:'IBM Plex Mono'; font-size:14px;
+  }
+  input:focus, select:focus{outline:2px solid var(--yellow); border-color:var(--yellow);}
+  label.field-label{display:block; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin:12px 0 5px;}
+  label.field-label:first-child{margin-top:0;}
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    padding:12px 16px; border-radius:6px; border:1px solid transparent; cursor:pointer;
+    font-family:'Oswald'; text-transform:uppercase; letter-spacing:.04em; font-size:14px; font-weight:600;
+    width:100%;
+  }
+  .btn-primary{background:var(--yellow); color:#1B1E20;}
+  .btn-primary:active{background:var(--yellow-dim);}
+  .btn-outline{background:transparent; border:1px solid var(--border); color:var(--text);}
+  .btn-danger{background:transparent; border:1px solid var(--red); color:var(--red);}
+  .btn-row{display:flex; gap:8px;}
+  .btn-row .btn{width:auto; flex:1;}
+
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:12px;}
+
+  .empty{
+    text-align:center; padding:40px 20px; color:var(--muted);
+    border:1px dashed var(--border); border-radius:8px;
+  }
+  .empty .big{font-size:32px; margin-bottom:8px;}
+
+  .search-wrap{position:relative; margin-bottom:14px;}
+
+  .loc-group{margin-bottom:14px;}
+  .loc-group summary{
+    cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between;
+    background:var(--panel-2); border:1px solid var(--border); border-radius:6px; padding:10px 12px;
+    font-family:'Oswald'; text-transform:uppercase; font-size:13px; letter-spacing:.03em;
+  }
+  .loc-group summary::-webkit-details-marker{display:none;}
+  .loc-group summary .chev{color:var(--yellow);}
+  .part-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 12px; border-bottom:1px solid var(--border);
+  }
+  .part-row:last-child{border-bottom:none;}
+  .part-row .pname{font-size:13px;}
+  .part-row .pnum{font-size:11px; color:var(--muted);}
+  .qty-pill{
+    font-family:'Oswald'; font-weight:600; font-size:14px; padding:4px 10px; border-radius:20px;
+    background:var(--panel); border:1px solid var(--border);
+  }
+  .qty-pill.low{color:var(--red); border-color:var(--red);}
+  .qty-pill.ok{color:var(--green); border-color:var(--green);}
+
+  .loc-card{
+    background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:12px;
+    display:flex; align-items:center; gap:12px; margin-bottom:10px;
+  }
+  .loc-card .qr-thumb{background:#fff; padding:4px; border-radius:4px; flex-shrink:0;}
+  .loc-card .qr-thumb canvas, .loc-card .qr-thumb img{display:block; width:56px; height:56px;}
+  .loc-card .meta{flex:1; min-width:0;}
+  .loc-card .code{font-size:15px; color:var(--yellow); font-weight:600;}
+  .loc-card .path{font-size:11px; color:var(--muted); margin-top:2px;}
+  .loc-card .del{background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:6px;}
+
+  .breadcrumb{
+    background:var(--panel-2); border:1px solid var(--yellow); border-radius:6px;
+    padding:12px; margin-bottom:14px;
+  }
+  .breadcrumb .code{color:var(--yellow); font-family:'Oswald'; font-size:18px; font-weight:600;}
+  .breadcrumb .path{color:var(--muted); font-size:12px; margin-top:3px;}
+
+  .toggle-group{display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-bottom:4px;}
+  .toggle-group button{
+    flex:1; padding:10px; background:var(--panel-2); border:none; color:var(--text);
+    font-family:'Oswald'; text-transform:uppercase; font-size:13px; cursor:pointer;
+  }
+  .toggle-group button.active-add{background:var(--green); color:#1B1E20;}
+  .toggle-group button.active-remove{background:var(--red); color:#1B1E20;}
+
+  .stepper{display:flex; align-items:center; gap:10px; margin-top:6px;}
+  .stepper button{
+    width:42px; height:42px; border-radius:6px; border:1px solid var(--border); background:var(--panel-2);
+    color:var(--text); font-size:20px; cursor:pointer;
+  }
+  .stepper input{text-align:center; flex:1; font-size:18px;}
+
+  .toast{
+    position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+    background:var(--yellow); color:#1B1E20; padding:10px 18px; border-radius:20px;
+    font-family:'Oswald'; text-transform:uppercase; font-size:13px; font-weight:600;
+    opacity:0; transition:opacity .2s; z-index:50; pointer-events:none; white-space:nowrap;
+  }
+  .toast.show{opacity:1;}
+
+  .hist-item{font-size:11px; color:var(--muted); padding:6px 0; border-bottom:1px solid var(--border);}
+  .hist-item:last-child{border-bottom:none;}
+  .hist-item b{color:var(--text);}
+
+  nav.tabs{
+    position:fixed; bottom:0; left:0; right:0; z-index:20;
+    background:var(--panel); border-top:1px solid var(--border);
+    display:flex; padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+  }
+  nav.tabs button{
+    flex:1; background:none; border:none; color:var(--muted); padding:8px 4px;
+    display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer;
+    font-family:'Oswald'; text-transform:uppercase; font-size:11px; letter-spacing:.03em;
+  }
+  nav.tabs button.active{color:var(--yellow);}
+  nav.tabs button .ic{font-size:18px;}
+
+  #printArea{display:none;}
+  @media print{
+    body *{visibility:hidden;}
+    #printArea, #printArea *{visibility:visible;}
+    #printArea{
+      display:block; position:absolute; top:0; left:0; width:100%;
+      background:#fff; color:#000;
+    }
+    .print-label{
+      display:inline-flex; flex-direction:column; align-items:center; justify-content:center;
+      width:31%; margin:1%; padding:8px; border:1px dashed #999; page-break-inside:avoid;
+    }
+    .print-label canvas{width:100px; height:100px;}
+    .print-label .pcode{font-family:monospace; font-size:11px; font-weight:bold; margin-top:4px;}
+    .print-label .ppath{font-family:sans-serif; font-size:9px; text-align:center;}
+  }
+  a.link-btn{color:var(--yellow); font-size:12px; text-decoration:underline; cursor:pointer; text-align:center; display:block; margin-top:10px;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <h1>Spare Room</h1>
+    <span class="tag">MAINTENANCE PARTS INVENTORY</span>
+  </div>
+  <button class="icon-btn" onclick="exportExcel()">⬇ Excel</button>
+</header>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <section class="view active" id="view-dashboard">
+    <div class="stats-row">
+      <div class="stat"><div class="num" id="statParts">0</div><div class="lbl">Parts</div></div>
+      <div class="stat"><div class="num" id="statQty">0</div><div class="lbl">Total Qty</div></div>
+      <div class="stat"><div class="num" id="statLoc">0</div><div class="lbl">Locations</div></div>
+    </div>
+    <div class="search-wrap">
+      <input type="text" id="searchBox" placeholder="Search part name or number…" oninput="renderDashboard()">
+    </div>
+    <div id="dashboardList"></div>
+  </section>
+
+  <!-- LOCATIONS -->
+  <section class="view" id="view-locations">
+    <div class="card">
+      <h3 style="font-size:14px; margin-bottom:10px; color:var(--yellow);">Add a location</h3>
+      <label class="field-label">Cupboard</label>
+      <input type="text" id="inCupboard" placeholder="e.g. Cupboard A">
+      <label class="field-label">Deck / shelf</label>
+      <input type="text" id="inDeck" placeholder="e.g. Deck 2">
+      <label class="field-label">Bin (optional)</label>
+      <input type="text" id="inBin" placeholder="e.g. Bin 3 — leave blank for whole deck">
+      <div style="margin-top:14px;">
+        <button class="btn btn-primary" onclick="addLocation()">＋ Generate QR &amp; save</button>
+      </div>
+    </div>
+
+    <div class="btn-row" style="margin-bottom:14px;" id="printRow"></div>
+
+    <div id="locationsList"></div>
+  </section>
+
+  <!-- SCAN -->
+  <section class="view" id="view-scan">
+    <div id="scanStage">
+      <div class="card" style="text-align:center;">
+        <div style="font-size:34px; margin-bottom:6px;">📷</div>
+        <p style="font-size:13px; color:var(--muted); margin:0 0 14px;">Point at the QR sticker on the cupboard deck or bin</p>
+        <input type="file" accept="image/*" capture="environment" id="scanInput" style="display:none" onchange="handleScanFile(event)">
+        <button class="btn btn-primary" onclick="document.getElementById('scanInput').click()">Scan QR code</button>
+        <a class="link-btn" onclick="showManualPick()">Can't scan — pick location manually</a>
+      </div>
+      <div id="manualPickWrap" style="display:none;" class="card">
+        <label class="field-label">Choose location</label>
+        <select id="manualPickSelect"></select>
+        <button class="btn btn-outline" style="margin-top:10px;" onclick="confirmManualPick()">Use this location</button>
+      </div>
+    </div>
+
+    <div id="scanResolved" style="display:none;">
+      <div class="breadcrumb">
+        <div class="code" id="resCode"></div>
+        <div class="path" id="resPath"></div>
+      </div>
+
+      <h3 style="font-size:12px; color:var(--muted); margin-bottom:8px;">Parts already in this bin</h3>
+      <div id="existingPartsList"></div>
+
+      <button class="btn btn-outline" style="margin-top:12px;" onclick="toggleNewPartForm()" id="newPartToggleBtn">＋ Add a new part to this bin</button>
+
+      <div id="newPartForm" style="display:none; margin-top:14px;">
+        <label class="field-label">Part name</label>
+        <input type="text" id="partName" list="partNameList" placeholder="e.g. Hydraulic seal kit">
+        <datalist id="partNameList"></datalist>
+
+        <label class="field-label">Part number (optional)</label>
+        <input type="text" id="partNumber" placeholder="e.g. HYD-2201">
+
+        <label class="field-label">Low stock alert below (optional)</label>
+        <input type="number" id="partMinQty" placeholder="e.g. 5" min="0">
+
+        <label class="field-label">Quantity received</label>
+        <div class="stepper">
+          <button onclick="stepQty(-1)">－</button>
+          <input type="number" id="qtyInput" value="1" min="1">
+          <button onclick="stepQty(1)">＋</button>
+        </div>
+
+        <div style="margin-top:16px;">
+          <button class="btn btn-primary" onclick="saveNewPart()">Add to bin</button>
+        </div>
+      </div>
+
+      <a class="link-btn" onclick="resetScan()">Scan a different location</a>
+    </div>
+
+    <div class="card" style="margin-top:16px;" id="recentCard">
+      <h3 style="font-size:12px; color:var(--muted); margin-bottom:8px;">Recent activity</h3>
+      <div id="recentList"></div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabs">
+  <button class="active" data-view="dashboard" onclick="switchTab('dashboard')"><span class="ic">▦</span>Inventory</button>
+  <button data-view="locations" onclick="switchTab('locations')"><span class="ic">▥</span>Locations</button>
+  <button data-view="scan" onclick="switchTab('scan')"><span class="ic">◱</span>Scan</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+<div id="printArea"></div>
+
+<script>
+const FIREBASE_URL = "https://spare-part-inventry-default-rtdb.firebaseio.com";
+
+let locations = [];
+let inventory = [];
+let history = [];
+let mode = 'add';
+let pendingLocation = null;
+
+async function safeGet(key){
+  try{
+    const r = await fetch(`${FIREBASE_URL}/${key}.json`);
+    const data = await r.json();
+    return data || [];
+  }catch(e){ console.error('load error', e); return []; }
+}
+async function saveKey(key, val){
+  try{
+    const r = await fetch(`${FIREBASE_URL}/${key}.json`, {
+      method: 'PUT',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(val)
+    });
+    if(!r.ok) throw new Error('bad response');
+  }catch(e){ console.error('storage error', e); showToast('Save failed — check internet'); }
+}
+
+async function loadAll(){
+  locations = await safeGet('locations');
+  inventory = await safeGet('inventory');
+  history = await safeGet('history');
+  renderDashboard();
+  renderLocations();
+  renderPrintRow();
+}
+
+function slugify(s){
+  return (s||'').trim().toUpperCase().replace(/[^A-Z0-9]+/g,'').slice(0,10) || 'X';
+}
+
+function switchTab(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+/* ---------- LOCATIONS ---------- */
+
+async function addLocation(){
+  const cupboard = document.getElementById('inCupboard').value.trim();
+  const deck = document.getElementById('inDeck').value.trim();
+  const bin = document.getElementById('inBin').value.trim();
+  if(!cupboard || !deck){ showToast('Cupboard and deck are needed'); return; }
+  let code = slugify(cupboard)+'-'+slugify(deck)+(bin ? '-'+slugify(bin) : '');
+  let base = code, n = 1;
+  while(locations.some(l=>l.code===code)){ code = base+'-'+(++n); }
+  locations.push({code, cupboard, deck, bin});
+  await saveKey('locations', locations);
+  document.getElementById('inCupboard').value='';
+  document.getElementById('inDeck').value='';
+  document.getElementById('inBin').value='';
+  renderLocations();
+  renderPrintRow();
+  showToast('Location saved: '+code);
+}
+
+async function deleteLocation(code){
+  if(!confirm('Remove this location? Existing inventory rows for it will stay but the QR will no longer resolve.')) return;
+  locations = locations.filter(l=>l.code!==code);
+  await saveKey('locations', locations);
+  renderLocations();
+  renderPrintRow();
+}
+
+function renderLocations(){
+  const wrap = document.getElementById('locationsList');
+  if(locations.length===0){
+    wrap.innerHTML = '<div class="empty"><div class="big">▥</div>No locations yet.<br>Add a cupboard / deck / bin above to generate its QR label.</div>';
+    document.getElementById('manualPickSelect').innerHTML = '';
+    return;
+  }
+  wrap.innerHTML = '';
+  locations.forEach(loc=>{
+    const div = document.createElement('div');
+    div.className = 'loc-card';
+    const qrId = 'qr-'+loc.code;
+    div.innerHTML = `
+      <div class="qr-thumb" id="${qrId}"></div>
+      <div class="meta">
+        <div class="code">${loc.code}</div>
+        <div class="path">${loc.cupboard} → ${loc.deck}${loc.bin ? ' → '+loc.bin : ''}</div>
+      </div>
+      <button class="del" onclick="deleteLocation('${loc.code}')">✕</button>
+    `;
+    wrap.appendChild(div);
+    new QRCode(document.getElementById(qrId), {text:'LOC:'+loc.code, width:56, height:56, correctLevel: QRCode.CorrectLevel.M});
+  });
+
+  const sel = document.getElementById('manualPickSelect');
+  sel.innerHTML = locations.map(l=>`<option value="${l.code}">${l.code} — ${l.cupboard} / ${l.deck}${l.bin?' / '+l.bin:''}</option>`).join('');
+}
+
+function renderPrintRow(){
+  const row = document.getElementById('printRow');
+  if(locations.length===0){ row.innerHTML=''; return; }
+  row.innerHTML = `<button class="btn btn-outline" onclick="printLabels()">🖨 Print all QR labels</button>`;
+}
+
+function printLabels(){
+  const area = document.getElementById('printArea');
+  area.innerHTML = '';
+  locations.forEach(loc=>{
+    const box = document.createElement('div');
+    box.className = 'print-label';
+    const qrId = 'p-qr-'+loc.code;
+    box.innerHTML = `<div id="${qrId}"></div><div class="pcode">${loc.code}</div><div class="ppath">${loc.cupboard} / ${loc.deck}${loc.bin?' / '+loc.bin:''}</div>`;
+    area.appendChild(box);
+    new QRCode(document.getElementById(qrId), {text:'LOC:'+loc.code, width:100, height:100, correctLevel: QRCode.CorrectLevel.M});
+  });
+  setTimeout(()=>window.print(), 200);
+}
+
+/* ---------- SCAN ---------- */
+
+function handleScanFile(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const img = new Image();
+  img.onload = function(){
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width; canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img,0,0);
+    const data = ctx.getImageData(0,0,canvas.width, canvas.height);
+    const result = jsQR(data.data, data.width, data.height);
+    if(result && result.data && result.data.startsWith('LOC:')){
+      resolveLocation(result.data.slice(4));
+    }else{
+      showToast('No QR found in that photo — try again');
+    }
+    evt.target.value = '';
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+function showManualPick(){
+  if(locations.length===0){ showToast('Add a location first, in the Locations tab'); return; }
+  document.getElementById('manualPickWrap').style.display = 'block';
+}
+function confirmManualPick(){
+  const code = document.getElementById('manualPickSelect').value;
+  if(code) resolveLocation(code);
+}
+
+function resolveLocation(code){
+  const loc = locations.find(l=>l.code===code);
+  if(!loc){ showToast('Unknown location code: '+code); return; }
+  pendingLocation = loc;
+  document.getElementById('resCode').textContent = loc.code;
+  document.getElementById('resPath').textContent = loc.cupboard+' → '+loc.deck+(loc.bin?' → '+loc.bin:'');
+  document.getElementById('scanStage').style.display = 'none';
+  document.getElementById('manualPickWrap').style.display = 'none';
+  document.getElementById('scanResolved').style.display = 'block';
+  document.getElementById('newPartForm').style.display = 'none';
+  document.getElementById('newPartToggleBtn').textContent = '＋ Add a new part to this bin';
+  renderExistingPartsInScan();
+}
+
+function resetScan(){
+  pendingLocation = null;
+  document.getElementById('scanResolved').style.display = 'none';
+  document.getElementById('scanStage').style.display = 'block';
+}
+
+function stepQty(delta){
+  const el = document.getElementById('qtyInput');
+  el.value = Math.max(1, (parseInt(el.value)||1) + delta);
+}
+
+function renderExistingPartsInScan(){
+  const wrap = document.getElementById('existingPartsList');
+  const items = inventory.filter(i=>i.locationCode===pendingLocation.code);
+  if(items.length===0){
+    wrap.innerHTML = '<div class="empty" style="padding:18px;">Nothing logged in this bin yet.</div>';
+    return;
+  }
+  wrap.innerHTML = items.map(i=>{
+    const low = i.minQty!==null && i.minQty!==undefined && i.qty <= i.minQty;
+    return `<div class="card" style="padding:10px 12px; margin-bottom:8px;">
+      <div class="part-row" style="border:none; padding:0; cursor:pointer" onclick="toggleRowEdit('${i.id}')">
+        <div><div class="pname">${i.partName}</div>${i.partNumber?`<div class="pnum">${i.partNumber}</div>`:''}</div>
+        <div class="qty-pill ${low?'low':'ok'}">${i.qty}</div>
+      </div>
+      <div class="row-edit" id="edit-${i.id}" style="display:none; margin-top:10px;">
+        <div class="stepper">
+          <button onclick="rowStep('${i.id}', -1)">－</button>
+          <input type="number" id="rowqty-${i.id}" value="1" min="1">
+          <button onclick="rowStep('${i.id}', 1)">＋</button>
+        </div>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-outline" onclick="applyRowChange('${i.id}', 1)">＋ Add</button>
+          <button class="btn btn-danger" onclick="applyRowChange('${i.id}', -1)">－ Remove</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleRowEdit(id){
+  const el = document.getElementById('edit-'+id);
+  const isOpen = el.style.display === 'block';
+  document.querySelectorAll('.row-edit').forEach(e=>e.style.display='none');
+  el.style.display = isOpen ? 'none' : 'block';
+}
+function rowStep(id, delta){
+  const el = document.getElementById('rowqty-'+id);
+  el.value = Math.max(1, (parseInt(el.value)||1)+delta);
+}
+async function applyRowChange(id, sign){
+  const el = document.getElementById('rowqty-'+id);
+  const amount = parseInt(el.value)||1;
+  const row = inventory.find(i=>i.id===id);
+  if(!row) return;
+  const delta = sign*amount;
+  row.qty = Math.max(0, row.qty+delta);
+  row.lastUpdated = new Date().toISOString();
+  history.unshift({ts:new Date().toISOString(), partName:row.partName, partNumber:row.partNumber, locationCode:row.locationCode, change: delta});
+  history = history.slice(0,200);
+  await saveKey('inventory', inventory);
+  await saveKey('history', history);
+  showToast((sign>0?'Added ':'Removed ')+amount+' — '+row.partName);
+  renderExistingPartsInScan();
+  renderDashboard();
+}
+
+function toggleNewPartForm(){
+  const f = document.getElementById('newPartForm');
+  const show = f.style.display==='none';
+  f.style.display = show?'block':'none';
+  document.getElementById('newPartToggleBtn').textContent = show ? '－ Cancel' : '＋ Add a new part to this bin';
+  if(show){
+    document.getElementById('partName').value='';
+    document.getElementById('partNumber').value='';
+    document.getElementById('partMinQty').value='';
+    document.getElementById('qtyInput').value=1;
+    const dl = document.getElementById('partNameList');
+    const names = [...new Set(inventory.map(i=>i.partName))];
+    dl.innerHTML = names.map(n=>`<option value="${n}">`).join('');
+    document.getElementById('partName').focus();
+  }
+}
+
+async function saveNewPart(){
+  if(!pendingLocation) return;
+  const partName = document.getElementById('partName').value.trim();
+  if(!partName){ showToast('Enter a part name'); return; }
+  const partNumber = document.getElementById('partNumber').value.trim();
+  const minQty = document.getElementById('partMinQty').value ? parseInt(document.getElementById('partMinQty').value) : null;
+  const qty = parseInt(document.getElementById('qtyInput').value) || 0;
+
+  let row = inventory.find(i=>i.locationCode===pendingLocation.code &&
+    i.partNumber === (partNumber||'') && i.partName.toLowerCase()===partName.toLowerCase());
+  if(row){
+    row.qty += qty;
+    if(minQty!==null) row.minQty = minQty;
+    row.lastUpdated = new Date().toISOString();
+    showToast('Already existed — added '+qty+' to it');
+  }else{
+    inventory.push({
+      id: Date.now()+'-'+Math.random().toString(36).slice(2,7),
+      partName, partNumber, locationCode: pendingLocation.code,
+      qty: Math.max(0,qty), minQty: minQty, lastUpdated: new Date().toISOString()
+    });
+    showToast('Added '+partName+' to '+pendingLocation.code);
+  }
+  history.unshift({ts:new Date().toISOString(), partName, partNumber, locationCode: pendingLocation.code, change: qty});
+  history = history.slice(0,200);
+  await saveKey('inventory', inventory);
+  await saveKey('history', history);
+  renderDashboard();
+  toggleNewPartForm();
+  renderExistingPartsInScan();
+}
+
+/* ---------- DASHBOARD ---------- */
+
+function renderDashboard(){
+  const q = (document.getElementById('searchBox').value||'').toLowerCase();
+  const filtered = inventory.filter(i =>
+    i.partName.toLowerCase().includes(q) || (i.partNumber||'').toLowerCase().includes(q)
+  );
+
+  document.getElementById('statParts').textContent = new Set(inventory.map(i=>i.partName.toLowerCase())).size;
+  document.getElementById('statQty').textContent = inventory.reduce((s,i)=>s+i.qty,0);
+  document.getElementById('statLoc').textContent = locations.length;
+
+  const wrap = document.getElementById('dashboardList');
+  if(inventory.length===0){
+    wrap.innerHTML = '<div class="empty"><div class="big">▦</div>No parts logged yet.<br>Go to the Scan tab to log the first delivery.</div>';
+    renderRecent();
+    return;
+  }
+  if(filtered.length===0){
+    wrap.innerHTML = '<div class="empty">No parts match "'+q+'"</div>';
+    return;
+  }
+
+  const byLoc = {};
+  filtered.forEach(i=>{ (byLoc[i.locationCode] = byLoc[i.locationCode]||[]).push(i); });
+
+  wrap.innerHTML = '';
+  Object.keys(byLoc).sort().forEach(code=>{
+    const loc = locations.find(l=>l.code===code);
+    const label = loc ? `${loc.cupboard} → ${loc.deck}${loc.bin?' → '+loc.bin:''}` : '(location removed)';
+    const details = document.createElement('details');
+    details.className = 'loc-group';
+    details.open = !!q;
+    const rows = byLoc[code].map(i=>{
+      const low = i.minQty!==null && i.minQty!==undefined && i.qty <= i.minQty;
+      return `<div class="part-row">
+        <div><div class="pname">${i.partName}</div>${i.partNumber?`<div class="pnum">${i.partNumber}</div>`:''}</div>
+        <div class="qty-pill ${low?'low':'ok'}">${i.qty}</div>
+      </div>`;
+    }).join('');
+    details.innerHTML = `<summary>${code} — ${label} <span class="chev">▾</span></summary>${rows}`;
+    wrap.appendChild(details);
+  });
+  renderRecent();
+}
+
+function renderRecent(){
+  const wrap = document.getElementById('recentList');
+  if(history.length===0){ wrap.innerHTML = '<div class="hist-item">No activity yet.</div>'; return; }
+  wrap.innerHTML = history.slice(0,8).map(h=>{
+    const d = new Date(h.ts);
+    const sign = h.change>0 ? '+' : '';
+    return `<div class="hist-item"><b>${sign}${h.change}</b> ${h.partName} — ${h.locationCode} <span style="float:right">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span></div>`;
+  }).join('');
+}
+
+/* ---------- EXPORT ---------- */
+
+function exportExcel(){
+  if(inventory.length===0 && locations.length===0){ showToast('Nothing to export yet'); return; }
+  const invSheet = inventory.map(i=>{
+    const loc = locations.find(l=>l.code===i.locationCode);
+    return {
+      'Part Name': i.partName,
+      'Part Number': i.partNumber||'',
+      'Location Code': i.locationCode,
+      'Cupboard': loc?loc.cupboard:'',
+      'Deck': loc?loc.deck:'',
+      'Bin': loc?loc.bin:'',
+      'Quantity': i.qty,
+      'Low Stock Alert': i.minQty ?? '',
+      'Last Updated': i.lastUpdated ? new Date(i.lastUpdated).toLocaleString() : ''
+    };
+  });
+  const locSheet = locations.map(l=>({'Code':l.code,'Cupboard':l.cupboard,'Deck':l.deck,'Bin':l.bin}));
+  const histSheet = history.map(h=>({
+    'Date/Time': new Date(h.ts).toLocaleString(),
+    'Part Name': h.partName, 'Part Number': h.partNumber||'',
+    'Location': h.locationCode, 'Change': h.change
+  }));
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(invSheet), 'Inventory');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(locSheet), 'Locations');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(histSheet), 'History');
+  XLSX.writeFile(wb, 'spare-inventory.xlsx');
+}
+
+loadAll();
+</script>
+</body>
+</html>
